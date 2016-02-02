@@ -3,6 +3,7 @@
 
 """Retrospective update of Domoticz with Withings data ON DB LEVEL. BE CAREFULL!"""
 
+import os
 import sys
 import time
 import sqlite3
@@ -39,7 +40,15 @@ end = int(time.time())
 print
 print "Withings WS-50 Syncer Version " + _VERSION_
 print
-print "[-] Authenticating"
+
+if os.path.exists(args.database):
+    print "[-] Database " + args.database
+else:
+    print "[-] Database not found " + args.database
+    print
+    sys.exit()
+
+print "[-] Authenticating at account.withings.com"
 
 try:
     response = s.request("POST", URL_AUTH, data=AUTH_DATA)
