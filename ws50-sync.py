@@ -24,7 +24,7 @@ URL_ASSO = "https://healthmate.withings.com/index/service/association"
 
 parser = argparse.ArgumentParser(description='Withings WS-50 Syncer by dynasticorpheus@gmail.com')
 parser.add_argument('-u', '--username', help='username (email) in use with account.withings.com', required=True)
-parser.add_argument('-p', '--password', help='password in use with my.gigaset-elements.com', required=True)
+parser.add_argument('-p', '--password', help='password in use with account.withings.com', required=True)
 parser.add_argument('-c', '--co2', help='co2 idx', type=int, required=True)
 parser.add_argument('-t', '--temperature', help='temperature idx', type=int, required=True)
 parser.add_argument('-d', '--database', help='fully qualified name of database-file', required=True)
