@@ -14,7 +14,7 @@ from datetime import datetime
 
 
 _AUTHOR_ = 'dynasticorpheus@gmail.com'
-_VERSION_ = "0.2.0"
+_VERSION_ = "0.2.1"
 
 TMPID = 12
 CO2ID = 35
@@ -97,12 +97,12 @@ try:
     count = 0
     for item in data['body']['series']:
         for item2 in reversed(item['data']):
-            print('[-] INSERT INTO Meter VALUES (' + str(args.co2) + ',' + str(item2['value']) + ',0,' + "'" + time.strftime(
+            print('[-] INSERT INTO Meter (DeviceRowID,Value,Date) VALUES (' + str(args.co2) + ',' + str(item2['value']) + ",'" + time.strftime(
                 '%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
             if args.noaction is not True:
-                c.execute('INSERT INTO Meter VALUES (' + str(args.co2) + ',' + str(item2['value']) + ',0,' + "'" + time.strftime(
+                c.execute('INSERT INTO Meter (DeviceRowID,Value,Date) VALUES (' + str(args.co2) + ',' + str(item2['value']) + ",'" + time.strftime(
                     '%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
-            count = count + 1
+            count += 1
             sys.stdout.write("\033[F")
             sys.stdout.write("\033[K")
 except Exception:
@@ -117,12 +117,12 @@ try:
     count = 0
     for item in data2['body']['series']:
         for item2 in reversed(item['data']):
-            print('[-] INSERT INTO Temperature VALUES (' + str(args.temperature) + ',' + str(item2['value']) + ',0.0,0,0,0.0,0.0,' + "'" + time.strftime(
-                '%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
+            print('[-] INSERT INTO Temperature (DeviceRowID,Temperature,Date) VALUES (' + str(args.temperature) + ',' + str(item2['value']) + ',' + "'" +
+                  time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
             if args.noaction is not True:
-                c.execute('INSERT INTO Temperature VALUES (' + str(args.temperature) + ',' + str(item2['value']) + ',0.0,0,0,0.0,0.0,' + "'" + time.strftime(
-                    '%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
-            count = count + 1
+                c.execute('INSERT INTO Temperature (DeviceRowID,Temperature,Date) VALUES (' + str(args.temperature) + ',' + str(item2['value']) + ',' + "'" +
+                          time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
+            count += 1
             sys.stdout.write("\033[F")
             sys.stdout.write("\033[K")
 except Exception:
