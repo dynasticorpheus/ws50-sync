@@ -14,7 +14,7 @@ from datetime import datetime
 
 
 _AUTHOR_ = 'dynasticorpheus@gmail.com'
-_VERSION_ = "0.2.1"
+_VERSION_ = "0.2.2"
 
 TMPID = 12
 CO2ID = 35
@@ -29,6 +29,7 @@ parser.add_argument('-p', '--password', help='password in use with account.withi
 parser.add_argument('-c', '--co2', help='co2 idx', type=int, required=True)
 parser.add_argument('-t', '--temperature', help='temperature idx', type=int, required=True)
 parser.add_argument('-d', '--database', help='fully qualified name of database-file', required=True)
+parser.add_argument('-r', '--remove', help='clear existing data from database', action='store_true', required=False)
 parser.add_argument('-n', '--noaction', help='do not update database', action='store_true', required=False)
 args = parser.parse_args()
 
@@ -43,9 +44,23 @@ print
 
 if os.path.exists(args.database):
     print "[-] Database " + args.database
+    conn = sqlite3.connect(args.database, timeout=60)
+    c = conn.cursor()
 else:
     print "[-] Database not found " + args.database
     print
+    sys.exit()
+
+if args.remove:
+    print "[-] Removing existing CO2 & TEMPERATURE data from database"
+    try:
+        c.execute('DELETE FROM METER WHERE DeviceRowID = ' + str(args.co2) + ';')
+        c.execute('DELETE FROM TEMPERATURE WHERE DeviceRowID = ' + str(args.temperature) + ';')
+        conn.commit()
+    except Exception:
+        print "[-] Data removal failed, exiting"
+        conn.rollback()
+    conn.close()
     sys.exit()
 
 print "[-] Authenticating at account.withings.com"
@@ -62,9 +77,6 @@ payload = "accountid=" + str(accountid) + "&action=getbyaccountid&appliver=c7726
 response = s.request("POST", URL_ASSO, data=payload)
 r = response.json()
 deviceid = r['body']['associations'][0]['deviceid']
-
-conn = sqlite3.connect(args.database, timeout=60)
-c = conn.cursor()
 
 for row in c.execute('select max(Date) from Meter where DeviceRowID=' + str(args.co2)):
     if row[0] is None:
