@@ -14,10 +14,13 @@ from datetime import datetime
 
 
 _AUTHOR_ = 'dynasticorpheus@gmail.com'
-_VERSION_ = "0.2.2"
+_VERSION_ = "0.2.3"
 
 TMPID = 12
 CO2ID = 35
+
+NOW = int(time.time())
+PDAY = NOW - 86400
 
 URL_DATA = "https://healthmate.withings.com/index/service/v2/measure"
 URL_AUTH = "https://account.withings.com/connectionuser/account_login?appname=my2&appliver=c7726fda&r=https%3A%2F%2Fhealthmate.withings.com%2Fhome"
@@ -60,7 +63,9 @@ if args.remove:
     except Exception:
         print "[-] Data removal failed, exiting"
         conn.rollback()
+    c.execute('PRAGMA wal_checkpoint(PASSIVE);')
     conn.close()
+    print
     sys.exit()
 
 print "[-] Authenticating at account.withings.com"
@@ -78,18 +83,22 @@ response = s.request("POST", URL_ASSO, data=payload)
 r = response.json()
 deviceid = r['body']['associations'][0]['deviceid']
 
+
 for row in c.execute('select max(Date) from Meter where DeviceRowID=' + str(args.co2)):
     if row[0] is None:
-        START = 0
+        START = PDAY
     else:
         dt_obj = datetime.strptime(str(row[0]), "%Y-%m-%d %H:%M:%S")
         START = int(time.mktime(dt_obj.timetuple())) + 1
+        if START < PDAY:
+            START = PDAY
+            row is None
 
 BASE = "action=getmeashf&appliver=82dba0d8&appname=my2&apppfm=web&deviceid=" + str(deviceid) + "&enddate=" + \
     str(end) + "&sessionid=" + d['session_key'] + "&startdate=" + str(START) + "&meastype="
 
 if row[0] is None:
-    print "[-] Downloading complete data set"
+    print "[-] Downloading data from last 24 hours"
 else:
     print "[-] Downloading data newer than " + str(row[0])
 
@@ -106,7 +115,7 @@ data = r2.json()
 data2 = r3.json()
 
 try:
-    count = 0
+    countc = 0
     for item in data['body']['series']:
         for item2 in reversed(item['data']):
             print('[-] INSERT INTO Meter (DeviceRowID,Value,Date) VALUES (' + str(args.co2) + ',' + str(item2['value']) + ",'" + time.strftime(
@@ -114,7 +123,7 @@ try:
             if args.noaction is not True:
                 c.execute('INSERT INTO Meter (DeviceRowID,Value,Date) VALUES (' + str(args.co2) + ',' + str(item2['value']) + ",'" + time.strftime(
                     '%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
-            count += 1
+            countc += 1
             sys.stdout.write("\033[F")
             sys.stdout.write("\033[K")
 except Exception:
@@ -123,10 +132,10 @@ except Exception:
     sys.exit()
 
 
-print "[-] Updating database with " + str(count) + " CO2 measurements" + " [" + str(not args.noaction).upper() + "]"
+print "[-] Updating database with " + str(countc) + " CO2 measurements" + " [" + str(not args.noaction).upper() + "]"
 
 try:
-    count = 0
+    countt = 0
     for item in data2['body']['series']:
         for item2 in reversed(item['data']):
             print('[-] INSERT INTO Temperature (DeviceRowID,Temperature,Date) VALUES (' + str(args.temperature) + ',' + str(item2['value']) + ',' + "'" +
@@ -134,7 +143,7 @@ try:
             if args.noaction is not True:
                 c.execute('INSERT INTO Temperature (DeviceRowID,Temperature,Date) VALUES (' + str(args.temperature) + ',' + str(item2['value']) + ',' + "'" +
                           time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
-            count += 1
+            countt += 1
             sys.stdout.write("\033[F")
             sys.stdout.write("\033[K")
 except Exception:
@@ -142,14 +151,17 @@ except Exception:
     conn.close()
     sys.exit()
 
-print "[-] Updating database with " + str(count) + " TEMPERATURE measurements" + " [" + str(not args.noaction).upper() + "]"
+print "[-] Updating database with " + str(countt) + " TEMPERATURE measurements" + " [" + str(not args.noaction).upper() + "]"
 
-if args.noaction is not True:
+countt += countc
+
+if args.noaction is not True and countt > 0:
     print "[-] Committing and closing database"
     try:
         conn.commit()
     except Exception:
         conn.rollback()
+    c.execute('PRAGMA wal_checkpoint(PASSIVE);')
     conn.close()
 
 print
