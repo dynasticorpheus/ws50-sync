@@ -14,7 +14,7 @@ from datetime import datetime
 
 
 _AUTHOR_ = 'dynasticorpheus@gmail.com'
-_VERSION_ = "0.2.3"
+_VERSION_ = "0.2.4"
 
 TMPID = 12
 CO2ID = 35
@@ -34,6 +34,7 @@ parser.add_argument('-t', '--temperature', help='temperature idx', type=int, req
 parser.add_argument('-d', '--database', help='fully qualified name of database-file', required=True)
 parser.add_argument('-r', '--remove', help='clear existing data from database', action='store_true', required=False)
 parser.add_argument('-n', '--noaction', help='do not update database', action='store_true', required=False)
+parser.add_argument('-a', '--all', help='download all data instead of last 24 hours', action='store_true', required=False)
 args = parser.parse_args()
 
 AUTH_DATA = "email=" + args.username + "&is_admin=&password=" + args.password
@@ -85,7 +86,9 @@ deviceid = r['body']['associations'][0]['deviceid']
 
 
 for row in c.execute('select max(Date) from Meter where DeviceRowID=' + str(args.co2)):
-    if row[0] is None:
+    if args.all:
+        START = 0
+    elif row[0] is None:
         START = PDAY
     else:
         dt_obj = datetime.strptime(str(row[0]), "%Y-%m-%d %H:%M:%S")
@@ -97,7 +100,9 @@ for row in c.execute('select max(Date) from Meter where DeviceRowID=' + str(args
 BASE = "action=getmeashf&appliver=82dba0d8&appname=my2&apppfm=web&deviceid=" + str(deviceid) + "&enddate=" + \
     str(end) + "&sessionid=" + d['session_key'] + "&startdate=" + str(START) + "&meastype="
 
-if row[0] is None:
+if args.all:
+    print "[-] Downloading complete data set"
+elif row[0] is None:
     print "[-] Downloading data from last 24 hours"
 else:
     print "[-] Downloading data newer than " + str(row[0])
@@ -120,7 +125,7 @@ try:
         for item2 in reversed(item['data']):
             print('[-] INSERT INTO Meter (DeviceRowID,Value,Date) VALUES (' + str(args.co2) + ',' + str(item2['value']) + ",'" + time.strftime(
                 '%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
-            if args.noaction is not True:
+            if not args.noaction:
                 c.execute('INSERT INTO Meter (DeviceRowID,Value,Date) VALUES (' + str(args.co2) + ',' + str(item2['value']) + ",'" + time.strftime(
                     '%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
             countc += 1
@@ -140,7 +145,7 @@ try:
         for item2 in reversed(item['data']):
             print('[-] INSERT INTO Temperature (DeviceRowID,Temperature,Date) VALUES (' + str(args.temperature) + ',' + str(item2['value']) + ',' + "'" +
                   time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
-            if args.noaction is not True:
+            if not args.noaction:
                 c.execute('INSERT INTO Temperature (DeviceRowID,Temperature,Date) VALUES (' + str(args.temperature) + ',' + str(item2['value']) + ',' + "'" +
                           time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
             countt += 1
@@ -155,7 +160,7 @@ print "[-] Updating database with " + str(countt) + " TEMPERATURE measurements" 
 
 countt += countc
 
-if args.noaction is not True and countt > 0:
+if not args.noaction and countt > 0:
     print "[-] Committing and closing database"
     try:
         conn.commit()
