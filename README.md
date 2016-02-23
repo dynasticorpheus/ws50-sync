@@ -3,8 +3,6 @@
 
 ws50-sync is a python based program which pulls air quality data from your Withings account and stores it directly in a Domoticz DB.
 
-Keep Domoticz running in the background whilst using this script otherwise the database journal will not record the changes and revert them at start up.
-
 
     Withings WS-50 Syncer by dynasticorpheus@gmail.com
 
