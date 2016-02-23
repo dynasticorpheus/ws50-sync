@@ -56,12 +56,12 @@ def init_database(db):
 
 
 def clear_devices(idx, table1, table2):
-        print "[-] Removing existing data from tables " + str(table1).upper() + " and " + str(table2).upper()
-        try:
-            c.execute('DELETE FROM ' + str(table1) + ' WHERE DeviceRowID = ' + str(idx) + ';')
-            c.execute('DELETE FROM ' + str(table2) + ' WHERE DeviceRowID = ' + str(idx) + ';')
-        except Exception:
-            sys.exit("[-] Data removal failed, exiting" + "\n")
+    print "[-] Removing existing data from tables " + str(table1).upper() + " and " + str(table2).upper()
+    try:
+        c.execute('DELETE FROM ' + str(table1) + ' WHERE DeviceRowID = ' + str(idx) + ';')
+        c.execute('DELETE FROM ' + str(table2) + ' WHERE DeviceRowID = ' + str(idx) + ';')
+    except Exception:
+        sys.exit("[-] Data removal failed, exiting" + "\n")
 
 
 def get_lastupdate(idx):
