@@ -19,8 +19,8 @@ _VERSION_ = "0.3.0"
 parser = argparse.ArgumentParser(description='Withings WS-50 Syncer by dynasticorpheus@gmail.com')
 parser.add_argument('-u', '--username', help='username (email) in use with account.withings.com', required=True)
 parser.add_argument('-p', '--password', help='password in use with account.withings.com', required=True)
-parser.add_argument('-c', '--co2', help='co2 idx', type=int, required=True)
-parser.add_argument('-t', '--temperature', help='temperature idx', type=int, required=True)
+parser.add_argument('-c', '--co2', help='co2 idx', type=int, required=False)
+parser.add_argument('-t', '--temperature', help='temperature idx', type=int, required=False)
 parser.add_argument('-d', '--database', help='fully qualified name of database-file', required=True)
 parser.add_argument('-r', '--remove', help='clear existing data from database', action='store_true', required=False)
 parser.add_argument('-n', '--noaction', help='do not update database', action='store_true', required=False)
@@ -64,9 +64,9 @@ def clear_devices(idx, table1, table2):
         sys.exit("[-] Data removal failed, exiting" + "\n")
 
 
-def get_lastupdate(idx):
+def get_lastupdate(idx, table):
     comment = ""
-    for dates in c.execute('select max(Date) from Meter where DeviceRowID=' + str(idx)):
+    for dates in c.execute('select max(Date) from ' + str(table) + ' where DeviceRowID=' + str(idx)):
         if dates[0] is None:
             lastdate = PDAY
             comment = " (24 hour limit)"
@@ -142,27 +142,33 @@ def commit_database():
 
 
 def main():
+    totalrows = 0
     print
     print "Withings WS-50 Syncer Version " + _VERSION_
     print
 
-    init_database(args.database)
+    if not (args.co2 or args.temperature):
+        parser.error('argument -c/--co2 and/or -t/--temperature is required')
 
-    if args.remove:
-        clear_devices(args.co2, "Meter", "MultiMeter_Calendar")
-        clear_devices(args.temperature, "Temperature", "Temperature_Calendar")
+    init_database(args.database)
 
     deviceid, sessionkey = authenticate_withings(args.username, args.password)
 
-    lastentrydate = get_lastupdate(args.co2)
+    if args.co2:
+        if args.remove:
+            clear_devices(args.co2, "Meter", "MultiMeter_Calendar")
+        lastentrydate = get_lastupdate(args.co2, "Meter")
+        co2data = download_data(deviceid, sessionkey, CO2ID, lastentrydate)
+        co2rows = update_meter("CO2", args.co2, "Value", "Meter", co2data)
+        totalrows = totalrows + co2rows
 
-    co2data = download_data(deviceid, sessionkey, CO2ID, lastentrydate)
-    tmpdata = download_data(deviceid, sessionkey, TMPID, lastentrydate)
-
-    co2rows = update_meter("CO2", args.co2, "Value", "Meter", co2data)
-    tmprows = update_meter("TEMPERATURE", args.temperature, "Temperature", "Temperature", tmpdata)
-
-    totalrows = co2rows + tmprows
+    if args.temperature:
+        if args.remove:
+            clear_devices(args.temperature, "Temperature", "Temperature_Calendar")
+        lastentrydate = get_lastupdate(args.temperature, "Temperature")
+        tmpdata = download_data(deviceid, sessionkey, TMPID, lastentrydate)
+        tmprows = update_meter("TEMPERATURE", args.temperature, "Temperature", "Temperature", tmpdata)
+        totalrows = totalrows + tmprows
 
     if not args.noaction and totalrows > 0:
         commit_database()
