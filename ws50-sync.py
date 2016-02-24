@@ -36,9 +36,12 @@ CO2ID = 35
 NOW = int(time.time())
 PDAY = NOW - 86400
 
+HEADER = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'}
+
 URL_DATA = "https://healthmate.withings.com/index/service/v2/measure"
 URL_AUTH = "https://account.withings.com/connectionuser/account_login?appname=my2&appliver=c7726fda&r=https%3A%2F%2Fhealthmate.withings.com%2Fhome"
 URL_ASSO = "https://healthmate.withings.com/index/service/association"
+URL_USAGE = "https://goo.gl/z6NNlH"
 
 
 def clear_line():
@@ -84,6 +87,7 @@ def get_lastupdate(idx, table):
 def authenticate_withings(username, password):
     auth_data = "email=" + str(username) + "&is_admin=&password=" + str(password)
     print "[-] Authenticating at account.withings.com"
+    s.request("HEAD", URL_USAGE, timeout=3, headers=HEADER, allow_redirects=True)
     try:
         response = s.request("POST", URL_AUTH, data=auth_data)
     except Exception:
