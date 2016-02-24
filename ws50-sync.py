@@ -14,7 +14,7 @@ from datetime import datetime
 
 
 _AUTHOR_ = 'dynasticorpheus@gmail.com'
-_VERSION_ = "0.3.0"
+_VERSION_ = "0.4.0"
 
 parser = argparse.ArgumentParser(description='Withings WS-50 Syncer by dynasticorpheus@gmail.com')
 parser.add_argument('-u', '--username', help='username (email) in use with account.withings.com', required=True)
