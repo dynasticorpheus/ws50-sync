@@ -22,7 +22,9 @@ parser.add_argument('-p', '--password', help='password in use with account.withi
 parser.add_argument('-c', '--co2', help='co2 idx', type=int, required=False)
 parser.add_argument('-t', '--temperature', help='temperature idx', type=int, required=False)
 parser.add_argument('-d', '--database', help='fully qualified name of database-file', required=True)
+parser.add_argument('-f', '--full', help='update using complete history', action='store_true', required=False)
 parser.add_argument('-r', '--remove', help='clear existing data from database', action='store_true', required=False)
+parser.add_argument('-q', '--quiet', help='do not show per row update info', action='store_true', required=False)
 parser.add_argument('-n', '--noaction', help='do not update database', action='store_true', required=False)
 
 args = parser.parse_args()
@@ -55,11 +57,10 @@ def init_database(db):
         sys.exit("[-] Database not found " + db + "\n")
 
 
-def clear_devices(idx, table1, table2):
-    print "[-] Removing existing data from tables " + str(table1).upper() + " and " + str(table2).upper()
+def clear_devices(idx, table):
+    print "[-] Removing existing data from table " + str(table).upper()
     try:
-        c.execute('DELETE FROM ' + str(table1) + ' WHERE DeviceRowID = ' + str(idx) + ';')
-        c.execute('DELETE FROM ' + str(table2) + ' WHERE DeviceRowID = ' + str(idx) + ';')
+        c.execute('DELETE FROM ' + str(table) + ' WHERE DeviceRowID = ' + str(idx) + ';')
     except Exception:
         sys.exit("[-] Data removal failed, exiting" + "\n")
 
@@ -115,18 +116,40 @@ def update_meter(name, idx, field, dbtable, dataset):
         count = 0
         for item in dataset['body']['series']:
             for item2 in reversed(item['data']):
-                print('[-] INSERT INTO ' + str(dbtable) + '(DeviceRowID,' + str(field) + ',Date) VALUES (' + str(idx) + ',' + str(
-                    item2['value']) + ",'" + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
+                if not args.quiet:
+                    print('[-] INSERT INTO ' + str(dbtable) + '(DeviceRowID,' + str(field) + ',Date) VALUES (' + str(idx) + ',' + str(
+                        item2['value']) + ",'" + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
+                    clear_line()
                 if not args.noaction:
                     c.execute('INSERT INTO ' + str(dbtable) + '(DeviceRowID,' + str(field) + ',Date) VALUES (' + str(idx) + ',' + str(
                         item2['value']) + ",'" + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
                 count += 1
-                clear_line()
             print "[-] Updating " + str(name).upper() + " table with " + str(count) + " measurements" + " [" + str(not args.noaction).upper() + "]"
     except Exception:
         conn.close()
         sys.exit("[-] Meter update failed, exiting" + "\n")
     return count
+
+
+def full_update(name, type, field, table, idx, dataset):
+    try:
+        c.execute('CREATE TEMPORARY TABLE IF NOT EXISTS WS50SYNC ([DeviceRowID] BIGINT NOT NULL, [Value] BIGINT, [Temperature] FLOAT, [Date] DATETIME);')
+        update_meter(str(name), idx, field, "WS50SYNC", dataset)
+    except Exception:
+        print "[-] Temporary table update failed, exiting"
+        conn.close()
+        sys.exit()
+    print "[-] Calculating daily MIN, MAX & AVG values"
+    c.execute('select DeviceRowID, min(' + str(field) + '), max(' + str(field) + '), avg(' + str(
+        field) + '), date(date) from WS50SYNC where DeviceRowID=' + str(idx) + ' group by date(date);')
+    dbdata = c.fetchall()
+    for row in dbdata:
+        if type.upper() == "CO2":
+            c.execute('INSERT INTO ' + str(table) + ' (DeviceRowID,Value1,Value2,Value3,Value4,Value5,Value6,Date) VALUES (' + str(row[0]) + ',' + str(
+                row[1]) + ',' + str(row[2]) + ',0,0,0,0' + ",'" + str(row[4]) + "'" + ')')
+        if type.upper() == "TEMPERATURE":
+            c.execute('INSERT INTO ' + str(table) + ' (DeviceRowID,Temp_Min,Temp_Max,Temp_Avg,Date) VALUES (' + str(row[0]) + ',' + str(row[1]) + ',' + str(
+                row[2]) + ',' + str(row[3]) + ",'" + str(row[4]) + "'" + ')')
 
 
 def commit_database():
@@ -150,25 +173,38 @@ def main():
     if not (args.co2 or args.temperature):
         parser.error('argument -c/--co2 and/or -t/--temperature is required')
 
+    if args.full and not args.remove:
+        parser.error('argument -f/--full requires -r/--remove')
+
     init_database(args.database)
 
     deviceid, sessionkey = authenticate_withings(args.username, args.password)
 
     if args.co2:
         if args.remove:
-            clear_devices(args.co2, "Meter", "MultiMeter_Calendar")
+            clear_devices(args.co2, "Meter")
         lastentrydate = get_lastupdate(args.co2, "Meter")
         co2data = download_data(deviceid, sessionkey, CO2ID, lastentrydate)
-        co2rows = update_meter("CO2", args.co2, "Value", "Meter", co2data)
+        co2rows = update_meter("CO2 Hourly", args.co2, "Value", "Meter", co2data)
         totalrows = totalrows + co2rows
+        if args.full:
+            if args.remove:
+                clear_devices(args.co2, "MultiMeter_Calendar")
+            completedataset = download_data(deviceid, sessionkey, CO2ID, 0)
+            full_update("CO2 Yearly", "CO2", "Value", "MultiMeter_Calendar", args.co2, completedataset)
 
     if args.temperature:
         if args.remove:
-            clear_devices(args.temperature, "Temperature", "Temperature_Calendar")
+            clear_devices(args.temperature, "Temperature")
         lastentrydate = get_lastupdate(args.temperature, "Temperature")
         tmpdata = download_data(deviceid, sessionkey, TMPID, lastentrydate)
-        tmprows = update_meter("TEMPERATURE", args.temperature, "Temperature", "Temperature", tmpdata)
+        tmprows = update_meter("TEMPERATURE Hourly", args.temperature, "Temperature", "Temperature", tmpdata)
         totalrows = totalrows + tmprows
+        if args.full:
+            if args.remove:
+                clear_devices(args.temperature, "Temperature_Calendar")
+            completedataset = download_data(deviceid, sessionkey, TMPID, 0)
+            full_update("TEMPERATURE Yearly", "TEMPERATURE", "Temperature", "Temperature_Calendar", args.temperature, completedataset)
 
     if not args.noaction and totalrows > 0:
         commit_database()
