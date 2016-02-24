@@ -99,10 +99,10 @@ def authenticate_withings(username, password):
 
 
 def download_data(deviceid, sessionkey, type, lastdate):
-    BASE = "action=getmeashf&appliver=82dba0d8&appname=my2&apppfm=web&deviceid=" + str(deviceid) + "&enddate=" + \
+    base = "action=getmeashf&appliver=82dba0d8&appname=my2&apppfm=web&deviceid=" + str(deviceid) + "&enddate=" + \
         str(NOW) + "&sessionid=" + str(sessionkey) + "&startdate=" + str(lastdate) + "&meastype="
     try:
-        payload = BASE + str(type)
+        payload = base + str(type)
         r = s.request("POST", URL_DATA, data=payload)
     except Exception:
         sys.exit("[-] Data download failed, exiting" + "\n")
@@ -159,8 +159,8 @@ def main():
     co2data = download_data(deviceid, sessionkey, CO2ID, lastentrydate)
     tmpdata = download_data(deviceid, sessionkey, TMPID, lastentrydate)
 
-    co2rows = update_meter("CO2", 36, "Value", "Meter", co2data)
-    tmprows = update_meter("TEMPERATURE", 37, "Temperature", "Temperature", tmpdata)
+    co2rows = update_meter("CO2", args.co2, "Value", "Meter", co2data)
+    tmprows = update_meter("TEMPERATURE", args.temperature, "Temperature", "Temperature", tmpdata)
 
     totalrows = co2rows + tmprows
 
