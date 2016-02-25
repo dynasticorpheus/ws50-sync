@@ -14,7 +14,7 @@ from datetime import datetime
 
 
 _AUTHOR_ = 'dynasticorpheus@gmail.com'
-_VERSION_ = "0.4.0"
+_VERSION_ = "0.4.1"
 
 parser = argparse.ArgumentParser(description='Withings WS-50 Syncer by dynasticorpheus@gmail.com')
 parser.add_argument('-u', '--username', help='username (email) in use with account.withings.com', required=True)
@@ -53,9 +53,13 @@ def init_database(db):
     global conn
     global c
     if os.path.exists(db):
-        print "[-] Attaching database " + db
         conn = sqlite3.connect(db, timeout=60)
         c = conn.cursor()
+        c.execute('SELECT * FROM Preferences  WHERE Key = "DB_Version";')
+        dbinfo = c.fetchall()
+        for row in dbinfo:
+            dbversion = row[1]
+        print "[-] Attaching database " + db + " [version " + str(dbversion) + "]"
     else:
         sys.exit("[-] Database not found " + db + "\n")
 
