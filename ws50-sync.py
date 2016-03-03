@@ -14,7 +14,7 @@ from datetime import datetime
 
 
 _AUTHOR_ = 'dynasticorpheus@gmail.com'
-_VERSION_ = "0.4.1"
+_VERSION_ = "0.4.2"
 
 parser = argparse.ArgumentParser(description='Withings WS-50 Syncer by dynasticorpheus@gmail.com')
 parser.add_argument('-u', '--username', help='username (email) in use with account.withings.com', required=True)
@@ -29,6 +29,8 @@ parser.add_argument('-n', '--noaction', help='do not update database', action='s
 
 args = parser.parse_args()
 s = requests.Session()
+s.mount("http://", requests.adapters.HTTPAdapter(max_retries=3))
+s.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
 
 TMPID = 12
 CO2ID = 35
@@ -55,7 +57,7 @@ def init_database(db):
     if os.path.exists(db):
         conn = sqlite3.connect(db, timeout=60)
         c = conn.cursor()
-        c.execute('SELECT * FROM Preferences  WHERE Key = "DB_Version";')
+        c.execute('SELECT * FROM Preferences WHERE Key = "DB_Version";')
         dbinfo = c.fetchall()
         for row in dbinfo:
             dbversion = row[1]
@@ -88,21 +90,37 @@ def get_lastupdate(idx, table):
     return lastdate
 
 
+def restpost(url, payload, head=None):
+    try:
+        if head is not None:
+            r = s.post(url, data=payload, timeout=90, stream=False, headers=head)
+        else:
+            r = s.post(url, data=payload, timeout=90, stream=False)
+    except requests.exceptions.RequestException as e:
+        sys.exit("ERROR " + str(e.message) + "\n")
+    if r.status_code != requests.codes.ok:
+        sys.exit("HTTP ERROR " + str(r.status_code) + "\n")
+    try:
+        commit_data = r.json()
+    except ValueError:
+        commit_data = r
+    return commit_data
+
+
 def authenticate_withings(username, password):
     auth_data = "email=" + str(username) + "&is_admin=&password=" + str(password)
     print "[-] Authenticating at account.withings.com"
     s.request("HEAD", URL_USAGE, timeout=3, headers=HEADER, allow_redirects=True)
-    try:
-        response = s.request("POST", URL_AUTH, data=auth_data)
-    except Exception:
-        sys.exit("[-] Authenticating failed, exiting" + "\n")
-    jar = s.cookies.get_dict()
+    response = restpost(URL_AUTH, auth_data)
+    if 'session_key' in s.cookies.get_dict():
+        jar = s.cookies.get_dict()
+    else:
+        sys.exit("[-] Session key negotiation failed, check username and/or password" + "\n")
     accountid = re.sub("[^0-9]", "", str(re.search('(?<=accountId)(.*)', response.content)))
     payload = "accountid=" + str(accountid) + "&action=getbyaccountid&appliver=c7726fda&appname=my2&apppfm=web&enrich=t&sessionid=" + \
         jar['session_key'] + "&type=-1"
-    response = s.request("POST", URL_ASSO, data=payload)
-    r = response.json()
-    deviceid = r['body']['associations'][0]['deviceid']
+    response = restpost(URL_ASSO, payload)
+    deviceid = response['body']['associations'][0]['deviceid']
     sessionkey = jar['session_key']
     return deviceid, sessionkey
 
@@ -183,6 +201,9 @@ def main():
 
     if args.full and not args.remove:
         parser.error('argument -f/--full requires -r/--remove')
+
+    if args.noaction:
+        print "[-] Dry run mode enabled, no changes to the database will be made"
 
     init_database(args.database)
 
