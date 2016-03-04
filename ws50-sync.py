@@ -14,7 +14,7 @@ from datetime import datetime
 
 
 _AUTHOR_ = 'dynasticorpheus@gmail.com'
-_VERSION_ = "0.4.2"
+_VERSION_ = "0.4.3"
 
 parser = argparse.ArgumentParser(description='Withings WS-50 Syncer by dynasticorpheus@gmail.com')
 parser.add_argument('-u', '--username', help='username (email) in use with account.withings.com', required=True)
@@ -24,6 +24,7 @@ parser.add_argument('-t', '--temperature', help='temperature idx', type=int, req
 parser.add_argument('-d', '--database', help='fully qualified name of database-file', required=True)
 parser.add_argument('-f', '--full', help='update using complete history', action='store_true', required=False)
 parser.add_argument('-r', '--remove', help='clear existing data from database', action='store_true', required=False)
+parser.add_argument('-w', '--warning', help='suppress urllib3 warnings', action='store_true', required=False)
 parser.add_argument('-q', '--quiet', help='do not show per row update info', action='store_true', required=False)
 parser.add_argument('-n', '--noaction', help='do not update database', action='store_true', required=False)
 
@@ -108,6 +109,11 @@ def restpost(url, payload, head=None):
 
 
 def authenticate_withings(username, password):
+    if args.warning:
+        try:
+            requests.packages.urllib3.disable_warnings()
+        except Exception:
+            pass
     auth_data = "email=" + str(username) + "&is_admin=&password=" + str(password)
     print "[-] Authenticating at account.withings.com"
     s.request("HEAD", URL_USAGE, timeout=3, headers=HEADER, allow_redirects=True)
