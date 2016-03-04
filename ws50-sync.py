@@ -14,7 +14,7 @@ from datetime import datetime
 
 
 _AUTHOR_ = 'dynasticorpheus@gmail.com'
-_VERSION_ = "0.4.3"
+_VERSION_ = "0.4.4"
 
 parser = argparse.ArgumentParser(description='Withings WS-50 Syncer by dynasticorpheus@gmail.com')
 parser.add_argument('-u', '--username', help='username (email) in use with account.withings.com', required=True)
@@ -22,6 +22,7 @@ parser.add_argument('-p', '--password', help='password in use with account.withi
 parser.add_argument('-c', '--co2', help='co2 idx', type=int, required=False)
 parser.add_argument('-t', '--temperature', help='temperature idx', type=int, required=False)
 parser.add_argument('-d', '--database', help='fully qualified name of database-file', required=True)
+parser.add_argument('-l', '--length', help='set short log length (defaults to one day)', type=int, choices=xrange(1, 8), default=1, required=False)
 parser.add_argument('-f', '--full', help='update using complete history', action='store_true', required=False)
 parser.add_argument('-r', '--remove', help='clear existing data from database', action='store_true', required=False)
 parser.add_argument('-w', '--warning', help='suppress urllib3 warnings', action='store_true', required=False)
@@ -37,7 +38,7 @@ TMPID = 12
 CO2ID = 35
 
 NOW = int(time.time())
-PDAY = NOW - 86400
+PDAY = NOW - (86400 * args.length)
 
 HEADER = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'}
 
@@ -80,13 +81,13 @@ def get_lastupdate(idx, table):
     for dates in c.execute('select max(Date) from ' + str(table) + ' where DeviceRowID=' + str(idx)):
         if dates[0] is None:
             lastdate = PDAY
-            comment = " (24 hour limit)"
+            comment = " (" + str(args.length) + " day limit)"
         else:
             dt_obj = datetime.strptime(str(dates[0]), "%Y-%m-%d %H:%M:%S")
             lastdate = int(time.mktime(dt_obj.timetuple())) + 1
             if lastdate < PDAY:
                 lastdate = PDAY
-                comment = " (24 hour limit)"
+                comment = " (" + str(args.length) + " day limit)"
     print "[-] Downloading all measurements recorded after " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(lastdate)) + comment
     return lastdate
 
