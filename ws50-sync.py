@@ -14,7 +14,7 @@ from datetime import datetime
 
 
 _AUTHOR_ = 'dynasticorpheus@gmail.com'
-_VERSION_ = "0.4.5"
+_VERSION_ = "0.4.6"
 
 parser = argparse.ArgumentParser(description='Withings WS-50 Syncer by dynasticorpheus@gmail.com')
 parser.add_argument('-u', '--username', help='username (email) in use with account.withings.com', required=True)
@@ -154,7 +154,7 @@ def download_data(deviceid, sessionkey, type, lastdate):
     return dataset
 
 
-def update_meter(name, idx, field, dbtable, dataset):
+def update_meter(name, idx, field, dbtable, dataset, status=None):
     try:
         count = 0
         for item in dataset['body']['series']:
@@ -166,7 +166,8 @@ def update_meter(name, idx, field, dbtable, dataset):
                 c.execute('INSERT INTO ' + str(dbtable) + '(DeviceRowID,' + str(field) + ',Date) VALUES (' + str(idx) + ',' + str(
                     item2['value']) + ",'" + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(item2['date'])) + "'" + ')')
                 count += 1
-            if count > 0:
+            if count > 0 and status is not None:
+                c.execute('UPDATE DeviceStatus SET ' + str(status) + ' = ' + str(item2['value']) + ' WHERE ID = ' + str(idx))
                 c.execute('UPDATE DeviceStatus SET LastUpdate = ' + "'" + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(
                     item2['date'])) + "'" + ' WHERE ID = ' + str(idx))
             print "[-] Updating " + str(name).upper() + " table with " + str(count) + " measurements" + " [" + str(not args.noaction).upper() + "]"
@@ -233,7 +234,7 @@ def main():
             clear_devices(args.co2, "Meter")
         lastentrydate = get_lastupdate(args.co2, "Meter")
         co2data = download_data(deviceid, sessionkey, CO2ID, lastentrydate)
-        co2rows = update_meter("CO2 Hourly", args.co2, "Value", "Meter", co2data)
+        co2rows = update_meter("CO2 Hourly", args.co2, "Value", "Meter", co2data, "nValue")
         totalrows = totalrows + co2rows
         if args.full:
             if args.remove:
@@ -246,7 +247,7 @@ def main():
             clear_devices(args.temperature, "Temperature")
         lastentrydate = get_lastupdate(args.temperature, "Temperature")
         tmpdata = download_data(deviceid, sessionkey, TMPID, lastentrydate)
-        tmprows = update_meter("TEMPERATURE Hourly", args.temperature, "Temperature", "Temperature", tmpdata)
+        tmprows = update_meter("TEMPERATURE Hourly", args.temperature, "Temperature", "Temperature", tmpdata, "sValue")
         totalrows = totalrows + tmprows
         if args.full:
             if args.remove:
