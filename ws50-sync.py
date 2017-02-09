@@ -10,11 +10,12 @@ import sqlite3
 import requests
 import re
 import argparse
+import lxml.html
 from datetime import datetime
 
 
 _AUTHOR_ = 'dynasticorpheus@gmail.com'
-_VERSION_ = "0.4.6"
+_VERSION_ = "0.4.7"
 
 parser = argparse.ArgumentParser(description='Withings WS-50 Syncer by dynasticorpheus@gmail.com')
 parser.add_argument('-u', '--username', help='username (email) in use with account.withings.com', required=True)
@@ -125,7 +126,12 @@ def authenticate_withings(username, password):
             pem = certifi.old_where()
         except Exception:
             pem = True
-    auth_data = "email=" + str(username) + "&is_admin=&password=" + str(password)
+    login = s.get(URL_AUTH)
+    login_html = lxml.html.fromstring(login.text)
+    hidden_inputs = login_html.xpath(r'//form//input[@type="hidden"]')
+    auth_data = {x.attrib["name"]: x.attrib["value"] for x in hidden_inputs}
+    auth_data['email'] = username
+    auth_data['password'] = password
     print "[-] Authenticating at account.withings.com"
     s.request("HEAD", URL_USAGE, timeout=3, headers=HEADER, allow_redirects=True, verify=pem)
     response = restpost(URL_AUTH, auth_data)
