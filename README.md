@@ -19,5 +19,7 @@ ws50-sync is a python based program which pulls air quality data from your Withi
                             fully qualified name of database-file
       -f, --full            update using complete history
       -r, --remove          clear existing data from database
+      -w, --warning         suppress urllib3 warnings
+      -i, --insecure        disable SSL/TLS certificate verification
       -q, --quiet           do not show per row update info
       -n, --noaction        do not update database
