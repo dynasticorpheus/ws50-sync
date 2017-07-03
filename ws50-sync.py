@@ -7,15 +7,14 @@ import os
 import sys
 import time
 import sqlite3
-import requests
-import re
 import argparse
-import lxml.html
+import hashlib
 from datetime import datetime
 
+import requests
 
 _AUTHOR_ = 'dynasticorpheus@gmail.com'
-_VERSION_ = "0.4.7"
+_VERSION_ = "0.4.8"
 
 parser = argparse.ArgumentParser(description='Withings WS-50 Syncer by dynasticorpheus@gmail.com')
 parser.add_argument('-u', '--username', help='username (email) in use with account.withings.com', required=True)
@@ -32,9 +31,6 @@ parser.add_argument('-q', '--quiet', help='do not show per row update info', act
 parser.add_argument('-n', '--noaction', help='do not update database', action='store_true', required=False)
 
 args = parser.parse_args()
-s = requests.Session()
-s.mount("http://", requests.adapters.HTTPAdapter(max_retries=3))
-s.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
 
 TMPID = 12
 CO2ID = 35
@@ -44,9 +40,9 @@ PDAY = NOW - (86400 * args.length)
 
 HEADER = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'}
 
-URL_DATA = "https://healthmate.withings.com/index/service/v2/measure"
-URL_AUTH = "https://account.withings.com/connectionuser/account_login?appname=my2&appliver=c7726fda&r=https%3A%2F%2Fhealthmate.withings.com%2Fhome"
-URL_ASSO = "https://healthmate.withings.com/index/service/association"
+URL_BASE = "https://scalews.withings.net/cgi-bin"
+URL_AUTH = URL_BASE + "/auth?action=login&appliver=3000201&apppfm=android&appname=wiscaleNG&callctx=foreground"
+URL_ASSO = URL_BASE + "/association?action=getbyaccountid&enrich=t&appliver=3000201&apppfm=android&appname=wiscaleNG&callctx=foreground&sessionid="
 URL_USAGE = "https://goo.gl/z6NNlH"
 
 
@@ -126,37 +122,26 @@ def authenticate_withings(username, password):
             pem = certifi.old_where()
         except Exception:
             pem = True
-    login = s.get(URL_AUTH)
-    login_html = lxml.html.fromstring(login.text)
-    hidden_inputs = login_html.xpath(r'//form//input[@type="hidden"]')
-    auth_data = {x.attrib["name"]: x.attrib["value"] for x in hidden_inputs}
-    auth_data['email'] = username
-    auth_data['password'] = password
-    print "[-] Authenticating at account.withings.com"
-    s.request("HEAD", URL_USAGE, timeout=3, headers=HEADER, allow_redirects=True, verify=pem)
-    response = restpost(URL_AUTH, auth_data)
-    if 'session_key' in s.cookies.get_dict():
-        jar = s.cookies.get_dict()
-    else:
-        sys.exit("[-] Session key negotiation failed, check username and/or password" + "\n")
-    accountid = re.sub("[^0-9]", "", str(re.search('(?<=accountId)(.*)', response.content)))
-    payload = "accountid=" + str(accountid) + "&action=getbyaccountid&appliver=c7726fda&appname=my2&apppfm=web&enrich=t&sessionid=" + \
-        jar['session_key'] + "&type=-1"
-    response = restpost(URL_ASSO, payload)
-    deviceid = response['body']['associations'][0]['deviceid']
-    sessionkey = jar['session_key']
+    requests.head(URL_USAGE, timeout=3, headers=HEADER, allow_redirects=True, verify=pem)
+    payload = {'email': username, 'hash': hashlib.md5(password).hexdigest(), 'duration': '900'}
+    print "[-] Authenticating at scalews.withings.net"
+    response = requests.post(URL_AUTH, data=payload)
+    id = response.json()
+    sessionkey = id['body']['sessionid']
+    response = requests.get(URL_ASSO + sessionkey)
+    id = response.json()
+    deviceid = id['body']['associations'][0]['deviceid']
     return deviceid, sessionkey
 
 
 def download_data(deviceid, sessionkey, type, lastdate):
-    base = "action=getmeashf&appliver=82dba0d8&appname=my2&apppfm=web&deviceid=" + str(deviceid) + "&enddate=" + \
-        str(NOW) + "&sessionid=" + str(sessionkey) + "&startdate=" + str(lastdate) + "&meastype="
+    payload = '/v2/measure?action=getmeashf&deviceid=' + str(deviceid) + '&meastype=' + str(type) + '&startdate=' + str(lastdate) + '&enddate=' + str(NOW) + \
+        '&appliver=3000201&apppfm=android&appname=wiscaleNG&callctx=foreground&sessionid=' + str(sessionkey)
     try:
-        payload = base + str(type)
-        r = s.request("POST", URL_DATA, data=payload)
+        response = requests.get(URL_BASE + payload)
     except Exception:
         sys.exit("[-] Data download failed, exiting" + "\n")
-    dataset = r.json()
+    dataset = response.json()
     return dataset
 
 
