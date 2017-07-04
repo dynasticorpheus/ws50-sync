@@ -90,23 +90,6 @@ def get_lastupdate(idx, table):
     return lastdate
 
 
-def restpost(url, payload, head=None):
-    try:
-        if head is not None:
-            r = s.post(url, data=payload, timeout=90, stream=False, headers=head, verify=pem)
-        else:
-            r = s.post(url, data=payload, timeout=90, stream=False, verify=pem)
-    except requests.exceptions.RequestException as e:
-        sys.exit("ERROR " + str(e.message) + "\n")
-    if r.status_code != requests.codes.ok:
-        sys.exit("HTTP ERROR " + str(r.status_code) + "\n")
-    try:
-        commit_data = r.json()
-    except ValueError:
-        commit_data = r
-    return commit_data
-
-
 def authenticate_withings(username, password):
     global pem
     if args.warning:
